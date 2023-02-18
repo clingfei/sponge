@@ -1,5 +1,7 @@
 For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.edu/class/cs144/vm_howto).
 
+My Assignments for CS144: https://fail.lingfei.xyz/_posts/CS144-notes/
+
 ## Sponge quickstart
 
 To set up your build directory:
