@@ -82,7 +82,6 @@ void TCPSender::fill_window() {
 //! \param window_size The remote receiver's advertised window size
 bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) { 
     uint64_t _ackno = unwrap(ackno, _isn, _next_seqno);
-    std::cout << "ackno: " << _ackno << _next_seqno << _bytes_in_flight << std::endl;
     _window_size = window_size;
     // if (_next_seqno == 1 && _bytes_in_flight != 0) {
     //     // 重置sender
@@ -96,7 +95,6 @@ bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     // }
     if (_ackno > _next_seqno || _ackno <= _next_seqno - _bytes_in_flight) 
         return false;
-    std::cout << "sender ack_received: " << ackno.raw_value() << "windowsize: " << window_size << std::endl;
     bool reset = false;
     // look through its collection of outstanding segments and remove any that have now been fully acknowledged
     while (!_segments_unacknowledged.empty()) {
@@ -125,9 +123,6 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
         return;
     _timer.tick(ms_since_last_tick);
     if (_timer.is_timeout()) {
-        std::cout << "timeout" << std::endl;
-        std::cout << "resending segment:" << "SYN: " << _segments_unacknowledged.front().header().syn << "ACK:" << _segments_unacknowledged.front().header().ack << 
-                "FIN:" << _segments_unacknowledged.front().header().fin << "ackno: " << _segments_unacknowledged.front().header().ackno << "seqno: " << _segments_unacknowledged.front().header().seqno << std::endl;
         _segments_out.push(_segments_unacknowledged.front());
         if (_window_size > 0) {
             _retransmission_timeout *= 2;
@@ -140,7 +135,6 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
 unsigned int TCPSender::consecutive_retransmissions() const { return _consecutive_retransmissions; }
 
 void TCPSender::send_empty_segment() {
-    std::cout << "syn in empty: " << _next_seqno << std::endl;
     TCPSegment segment;
     segment.header().seqno = wrap(_next_seqno, _isn);
     // segment.header().ack = true;

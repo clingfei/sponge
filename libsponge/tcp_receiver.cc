@@ -11,11 +11,6 @@ void DUMMY_CODE(Targs &&... /* unused */) {}
 using namespace std;
 
 void TCPReceiver::segment_received(const TCPSegment &seg) {
-    std::cout << "received: seqno: " <<  seg.header().seqno << "SYN: " << seg.header().syn 
-        << "ackno: " << seg.header().ackno << "ack: " << seg.header().ack << "fin: " << seg.header().fin 
-        << "length_in_seq_space: " << seg.length_in_sequence_space() << std::endl;
-    if (ackno().has_value())
-        std::cout << "current ackno: " << ackno().value() << std::endl;
     // bool flag = ackno().has_value();
     if (seg.header().syn) {
         // 若连接已建立
@@ -24,8 +19,10 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
         _syn = true;
         isn = seg.header().seqno;
         _ackno = 1;
-    } else if (!_syn || 
-        unwrap(seg.header().seqno, isn, _reassembler.stream_out().buffer_size()) + seg.length_in_sequence_space() < _ackno) 
+    } else if (!_syn || unwrap(seg.header().seqno, isn, _reassembler.stream_out().buffer_size()) + seg.length_in_sequence_space() <= _ackno)
+        // (seg.length_in_sequence_space() == 0 
+        //     && unwrap(seg.header().seqno, isn, _reassembler.stream_out().buffer_size() < _ackno)) 
+        //     || (seg.length_in_sequence_space() != 0 && unwrap(seg.header().seqno - 1, isn, _reassembler.stream_out().buffer_size()) <= _ackno))
             return;
     // if (seg.length_in_sequence_space() == 0) {
     //     _ackno++;
@@ -36,7 +33,6 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
         eof = true;
     }
     size_t index = 0;
-    std::cout << "seqno: " << seg.header().seqno << "isn: " << isn << "buffer_size: " << _reassembler.stream_out().buffer_size() << std::endl;
     // if (seg.header().seqno != isn) {
     if (!seg.header().syn) {
         index = unwrap(seg.header().seqno - 1, isn, _reassembler.stream_out().buffer_size());
@@ -47,11 +43,11 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     size_t stream_size = _reassembler.stream_out().buffer_size();
     _reassembler.push_substring(payload, index, eof);
     _ackno += _reassembler.stream_out().buffer_size() - stream_size;
-    std::cout << "new ackno: " << _ackno << std::endl;
     // _ackno = _reassembler.stream_out().buffer_size() + 1;
     // std::cout << _reassembler.stream_out().buffer_size() << std::endl;
     if (_fin && _reassembler.unassembled_bytes() == 0) 
         _ackno++;
+    
     // std::cout << "keep alive, update _ackno" << std::endl;
     // if (seg.header().seqno == ackno().value()) {
     //     _ackno = unwrap(seg.header().seqno, isn, _reassembler.stream_out().buffer_size()) + 1;

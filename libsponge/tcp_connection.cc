@@ -35,6 +35,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    // RST标志，直接关闭连接
    if (seg.header().rst) {
        // 在出站入站流中标记错误，使active返回false
+       std::cout << "rst" << std::endl;
        _receiver.stream_out().set_error();
        _sender.stream_in().set_error();
        _active = false;
@@ -42,6 +43,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    // 当前是Closed/Listen状态
    else if (_sender.next_seqno_absolute() == 0) {
        // 收到SYN，说明TCP连接由对方启动，进入Syn-Revd状态
+       std::cout << "closed-listen" << std::endl;
        if (seg.header().syn) {
            // 此时还没有ACK，所以sender不需要ack_received
            _receiver.segment_received(seg);
@@ -53,11 +55,13 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    else if (_sender.next_seqno_absolute() == _sender.bytes_in_flight() && !_receiver.ackno().has_value()) {
        if (seg.header().syn && seg.header().ack) {
            // 收到SYN和ACK，说明由对方主动开启连接，进入Established状态，通过一个空包来发送ACK
+           std::cout << "syn-sent-1" << std::endl;
            _sender.ack_received(seg.header().ackno, seg.header().win);
            _receiver.segment_received(seg);
            _sender.send_empty_segment();
            send_data();
        } else if (seg.header().syn && !seg.header().ack) {
+            std::cout << "syn-sent-2" << std::endl;
            // 只收到了SYN，说明由双方同时开启连接，进入Syn-Rcvd状态，没有接收到对方的ACK，我们主动发一个
            _receiver.segment_received(seg);
            _sender.send_empty_segment();
@@ -67,6 +71,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    // 当前是Syn-Revd状态，并且输入没有结束
    else if (_sender.next_seqno_absolute() == _sender.bytes_in_flight() && _receiver.ackno().has_value() &&
             !_receiver.stream_out().input_ended()) {
+        std::cout << "syn-revd" << std::endl;
        // 接收ACK，进入Established状态
        _sender.ack_received(seg.header().ackno, seg.header().win);
        _receiver.segment_received(seg);
@@ -74,6 +79,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    // 当前是Established状态，连接已建立
    else if (_sender.next_seqno_absolute() > _sender.bytes_in_flight() && !_sender.stream_in().eof()) {
        // 发送数据，如果接到数据，则更新ACK
+       std::cout << "Established" << std::endl;
        _sender.ack_received(seg.header().ackno, seg.header().win);
        _receiver.segment_received(seg);
        if (seg.length_in_sequence_space() > 0) {
@@ -86,6 +92,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    else if (_sender.stream_in().eof() && _sender.next_seqno_absolute() == _sender.stream_in().bytes_written() + 2 &&
             _sender.bytes_in_flight() > 0 && !_receiver.stream_out().input_ended()) {
        if (seg.header().fin) {
+            std::cout << "Fin-Wait-1-1" << std::endl;
            // 收到Fin，则发送新ACK，进入Closing/Time-Wait
            _sender.ack_received(seg.header().ackno, seg.header().win);
            _receiver.segment_received(seg);
@@ -93,6 +100,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
            send_data();
        } else if (seg.header().ack) {
            // 收到ACK，进入Fin-Wait-2
+           std::cout << "Fin-Wait-1-2" << std::endl;
            _sender.ack_received(seg.header().ackno, seg.header().win);
            _receiver.segment_received(seg);
            send_data();
@@ -101,6 +109,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    // 当前是Fin-Wait-2状态
    else if (_sender.stream_in().eof() && _sender.next_seqno_absolute() == _sender.stream_in().bytes_written() + 2 &&
             _sender.bytes_in_flight() == 0 && !_receiver.stream_out().input_ended()) {
+        std::cout << "Fin-Wait-2" << std::endl;
        _sender.ack_received(seg.header().ackno, seg.header().win);
        _receiver.segment_received(seg);
        _sender.send_empty_segment();
@@ -109,16 +118,18 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
    // 当前是Time-Wait状态
    else if (_sender.stream_in().eof() && _sender.next_seqno_absolute() == _sender.stream_in().bytes_written() + 2 &&
             _sender.bytes_in_flight() == 0 && _receiver.stream_out().input_ended()) {
-       if (seg.header().fin) {
+        std::cout << "Time-Wait" << std::endl;
+        if (seg.header().fin) {
            // 收到FIN，保持Time-Wait状态
            _sender.ack_received(seg.header().ackno, seg.header().win);
            _receiver.segment_received(seg);
            _sender.send_empty_segment();
            send_data();
-       }
+        }
    }
    // 其他状态
    else {
+        std::cout << "otherwise" << std::endl;
        _sender.ack_received(seg.header().ackno, seg.header().win);
        _receiver.segment_received(seg);
        _sender.fill_window();
