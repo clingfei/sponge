@@ -19,7 +19,6 @@ static void ack_listen_test(const TCPConfig &cfg,
                             const int lineno) {
     try {
         TCPTestHarness test = TCPTestHarness::in_listen(cfg);
-
         // any ACK should result in a RST
         test.send_ack(seqno, ackno);
 

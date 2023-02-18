@@ -26,9 +26,10 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
 uint64_t TCPSender::bytes_in_flight() const { return _bytes_in_flight; }
 
 bool TCPSender::send_segment(TCPSegment &segment, const size_t length) {
-    std::cout << "length: "<< length << std::endl;
     if (_next_seqno == 0) 
         segment.header().syn = true;
+    // if (_next_seqno != 0)
+    //     segment.header().ack = true;
     segment.header().seqno = wrap(_next_seqno, _isn);
     if (length < size_t(segment.header().syn))
         return false;
@@ -39,8 +40,6 @@ bool TCPSender::send_segment(TCPSegment &segment, const size_t length) {
         _fin = true;
         segment.header().fin = true;
     }
-    std::cout << "payload: " << segment.payload().str() << std::endl;
-    std::cout << segment.length_in_sequence_space() << _stream.eof() << std::endl;
     if (segment.length_in_sequence_space() == 0)
         return false;
     else {
@@ -71,7 +70,6 @@ void TCPSender::fill_window() {
                 fill_window = _window_size - _bytes_in_flight;
             else 
                 fill_window = 0;
-            std::cout << "fill_window: " << fill_window << std::endl;
             if (!send_segment(segment, fill_window))
                 break;
         }
@@ -82,21 +80,29 @@ void TCPSender::fill_window() {
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
-void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) { 
+bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) { 
     uint64_t _ackno = unwrap(ackno, _isn, _next_seqno);
+    std::cout << "ackno: " << _ackno << _next_seqno << _bytes_in_flight << std::endl;
     _window_size = window_size;
-    std::cout << "_ackno: " << _ackno << " _next_seqno: " << _next_seqno << " _bytes_in_flight: " << _bytes_in_flight << std::endl;
+    // if (_next_seqno == 1 && _bytes_in_flight != 0) {
+    //     // 重置sender
+    //     _segments_out = std::queue<TCPSegment>();
+    //     _segments_unacknowledged = std::queue<TCPSegment>();
+    //     _bytes_in_flight = 0;
+    //     _window_size = window_size;
+    //     _consecutive_retransmissions = 0;
+    //     _timer.reset(_initial_retransmission_timeout);
+    //     return true;
+    // }
     if (_ackno > _next_seqno || _ackno <= _next_seqno - _bytes_in_flight) 
-        return;
+        return false;
+    std::cout << "sender ack_received: " << ackno.raw_value() << "windowsize: " << window_size << std::endl;
     bool reset = false;
     // look through its collection of outstanding segments and remove any that have now been fully acknowledged
     while (!_segments_unacknowledged.empty()) {
         TCPSegment segment = _segments_unacknowledged.front();
-        std::cout << "lentgh in sequence space: " << segment.length_in_sequence_space() << std::endl;
-        std::cout << "unwrap: " << unwrap(segment.header().seqno, _isn, _next_seqno) << std::endl;
         if (unwrap(segment.header().seqno, _isn, _next_seqno) + segment.length_in_sequence_space() <= _ackno) {
             _bytes_in_flight -= segment.length_in_sequence_space();
-            std::cout << "bytes in flight: " << _bytes_in_flight << std::endl;
             _segments_unacknowledged.pop();
             reset = true;
         } else 
@@ -110,7 +116,8 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
         else 
             _timer.disable();
     }
- }
+    return true;
+}
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) { 
@@ -118,6 +125,9 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
         return;
     _timer.tick(ms_since_last_tick);
     if (_timer.is_timeout()) {
+        std::cout << "timeout" << std::endl;
+        std::cout << "resending segment:" << "SYN: " << _segments_unacknowledged.front().header().syn << "ACK:" << _segments_unacknowledged.front().header().ack << 
+                "FIN:" << _segments_unacknowledged.front().header().fin << "ackno: " << _segments_unacknowledged.front().header().ackno << "seqno: " << _segments_unacknowledged.front().header().seqno << std::endl;
         _segments_out.push(_segments_unacknowledged.front());
         if (_window_size > 0) {
             _retransmission_timeout *= 2;
@@ -130,7 +140,11 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
 unsigned int TCPSender::consecutive_retransmissions() const { return _consecutive_retransmissions; }
 
 void TCPSender::send_empty_segment() {
+    std::cout << "syn in empty: " << _next_seqno << std::endl;
     TCPSegment segment;
     segment.header().seqno = wrap(_next_seqno, _isn);
+    // segment.header().ack = true;
     _segments_out.push(segment);
 }
+
+size_t TCPSender::remaining_outbound_capacity() const { return _window_size; }

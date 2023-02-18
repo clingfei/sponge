@@ -75,7 +75,7 @@ class TCPSender {
     //!@{
 
     //! \brief A new acknowledgment was received
-    void ack_received(const WrappingInt32 ackno, const uint16_t window_size);
+    bool ack_received(const WrappingInt32 ackno, const uint16_t window_size);
 
     //! \brief Generate an empty-payload segment (useful for creating empty ACK segments)
     void send_empty_segment();
@@ -117,6 +117,10 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
+
+    size_t remaining_outbound_capacity() const;
+
+    bool is_fin() const { return _fin; }
 };
 
 // 每个TCPSender对应不止一个ticker，每次调用tick，遍历set，调用elapsed，判断是否超时，如果超时则重发segment，

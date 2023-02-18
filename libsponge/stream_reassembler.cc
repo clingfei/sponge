@@ -18,6 +18,7 @@ StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity),
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
+    std::cout << "push_string: " << data << index << eof << std::endl;
     size_t right = index + data.size();
     size_t bound = next_index + _capacity - _output.buffer_size();
     if (right <= next_index) {

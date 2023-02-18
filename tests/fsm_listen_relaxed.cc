@@ -21,7 +21,7 @@ int main() {
         // test #1: START -> LISTEN -> SYN -> SYN/ACK -> ACK
         {
             TCPTestHarness test_1(cfg);
-
+            std::cout << test_1._fsm.state()._active << test_1._fsm.state()._linger_after_streams_finish << std::endl;
             // tell the FSM to connect, make sure we get a SYN
             test_1.execute(Listen{});
             test_1.execute(ExpectState{State::LISTEN});

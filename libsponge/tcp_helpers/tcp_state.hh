@@ -24,10 +24,11 @@ class TCPState {
   private:
     std::string _sender{};
     std::string _receiver{};
-    bool _active{true};
-    bool _linger_after_streams_finish{true};
+    
 
   public:
+    bool _active{true};
+    bool _linger_after_streams_finish{true};
     bool operator==(const TCPState &other) const;
     bool operator!=(const TCPState &other) const;
 
